@@ -1,38 +1,45 @@
-const { exec } = require("child_process");
-const path = require("path");
+const ffmpeg = require("fluent-ffmpeg");
+const ffmpegPath = require("ffmpeg-static");
 
-async function renderVideo({ audio, music }) {
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+function renderVideo({ videos, audio, music, output }) {
 
     return new Promise((resolve, reject) => {
 
-        const output = path.join(
-            __dirname,
-            "..",
-            "output",
-            "video-final.mp4"
-        );
+        const command = ffmpeg();
 
-        const comando = `ffmpeg -y \
--loop 1 \
--f lavfi -i color=c=black:s=1920x1080:d=10 \
--i "${audio}" \
--i "${music}" \
--filter_complex "[2:a]volume=0.2[music];[1:a][music]amix=inputs=2:duration=first" \
--shortest \
--c:v libx264 \
--pix_fmt yuv420p \
-"${output}"`;
-
-        exec(comando, (erro) => {
-
-            if (erro) {
-                reject(erro);
-                return;
-            }
-
-            resolve(output);
-
+        // adiciona todos os vídeos
+        videos.forEach(video => {
+            command.input(video);
         });
+
+        // adiciona narração
+        command.input(audio);
+
+        // adiciona música
+        command.input(music);
+
+        command
+            .complexFilter([
+                {
+                    filter: "amix",
+                    options: {
+                        inputs: 2,
+                        duration: "first"
+                    },
+                    inputs: ["1:a", "2:a"],
+                    outputs: "mix"
+                }
+            ])
+            .outputOptions([
+                "-map 0:v",
+                "-map [mix]",
+                "-shortest"
+            ])
+            .save(output)
+            .on("end", resolve)
+            .on("error", reject);
 
     });
 
