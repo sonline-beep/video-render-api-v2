@@ -3,26 +3,24 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 
+const renderVideo = require("./utils/ffmpeg");
+
 const app = express();
 
 const PORT = process.env.PORT || 8080;
 
-// Garante que a pasta temp exista
 const tempDir = path.join(__dirname, "temp");
 
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Configuração do Multer
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, tempDir);
     },
     filename: (req, file, cb) => {
-        const timestamp = Date.now();
-        const nome = file.originalname.replace(/\s+/g, "_");
-        cb(null, `${timestamp}-${nome}`);
+        cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_"));
     }
 });
 
@@ -33,83 +31,62 @@ const upload = multer({
     }
 });
 
-// Teste
 app.get("/", (req, res) => {
     res.json({
-        status: "ok",
-        message: "API funcionando!"
+        status: "ok"
     });
 });
 
-// Upload
-app.post("/render", upload.any(), async (req, res) => {
+app.post(
+    "/render",
+    upload.fields([
+        { name: "videos", maxCount: 100 },
+        { name: "audio", maxCount: 1 },
+        { name: "music", maxCount: 1 }
+    ]),
+    async (req, res) => {
 
-    try {
+        try {
 
-        const videos = req.files.filter(f =>
-            f.fieldname.startsWith("videos")
-        );
+            const videos = (req.files.videos || []).map(v => v.path);
 
-        const audio = req.files.find(f =>
-            f.fieldname === "audio"
-        );
+            if (!videos.length) {
+                return res.status(400).json({
+                    error: "Nenhum vídeo recebido."
+                });
+            }
 
-        const music = req.files.find(f =>
-            f.fieldname === "music"
-        );
+            const audio = req.files.audio?.[0]?.path;
+            const music = req.files.music?.[0]?.path;
 
-        if (videos.length === 0) {
-            return res.status(400).json({
-                status: "erro",
-                message: "Nenhum vídeo enviado."
+            if (!audio || !music) {
+                return res.status(400).json({
+                    error: "Áudio ou música não enviados."
+                });
+            }
+
+            const finalVideo = await renderVideo(
+                videos,
+                audio,
+                music,
+                tempDir
+            );
+
+            res.download(finalVideo, "video-final.mp4");
+
+        } catch (err) {
+
+            console.error(err);
+
+            res.status(500).json({
+                error: err.message
             });
+
         }
 
-        res.json({
-
-            status: "ok",
-            message: "Arquivos recebidos.",
-
-            totalVideos: videos.length,
-
-            videos: videos.map(v => ({
-                campo: v.fieldname,
-                nome: v.originalname,
-                arquivo: v.filename,
-                tamanho: v.size
-            })),
-
-            audio: audio
-                ? {
-                    nome: audio.originalname,
-                    arquivo: audio.filename,
-                    tamanho: audio.size
-                }
-                : null,
-
-            music: music
-                ? {
-                    nome: music.originalname,
-                    arquivo: music.filename,
-                    tamanho: music.size
-                }
-                : null
-
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            status: "erro",
-            message: err.message
-        });
-
     }
-
-});
+);
 
 app.listen(PORT, () => {
-    console.log(`Servidor iniciado na porta ${PORT}`);
+    console.log("Servidor iniciado na porta " + PORT);
 });
