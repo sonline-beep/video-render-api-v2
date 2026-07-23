@@ -1,50 +1,38 @@
-const ffmpeg = require("fluent-ffmpeg");
+const { exec } = require("child_process");
 const path = require("path");
 
-async function renderVideo({
-    videos,
-    audio,
-    music,
-    output
-}) {
+async function renderVideo({ audio, music }) {
 
     return new Promise((resolve, reject) => {
 
-        if (!videos || videos.length === 0) {
-            return reject(new Error("Nenhum vídeo recebido."));
-        }
+        const output = path.join(
+            __dirname,
+            "..",
+            "output",
+            "video-final.mp4"
+        );
 
-        let command = ffmpeg();
+        const comando = `ffmpeg -y \
+-loop 1 \
+-f lavfi -i color=c=black:s=1920x1080:d=10 \
+-i "${audio}" \
+-i "${music}" \
+-filter_complex "[2:a]volume=0.2[music];[1:a][music]amix=inputs=2:duration=first" \
+-shortest \
+-c:v libx264 \
+-pix_fmt yuv420p \
+"${output}"`;
 
-        videos.forEach(video => {
-            command = command.input(video);
+        exec(comando, (erro) => {
+
+            if (erro) {
+                reject(erro);
+                return;
+            }
+
+            resolve(output);
+
         });
-
-        if (audio) {
-            command = command.input(audio);
-        }
-
-        if (music) {
-            command = command.input(music);
-        }
-
-        command
-            .on("start", cmd => {
-                console.log("FFmpeg iniciado:");
-                console.log(cmd);
-            })
-            .on("progress", progress => {
-                console.log("Progresso:", progress.percent || 0);
-            })
-            .on("end", () => {
-                console.log("Renderização concluída.");
-                resolve(output);
-            })
-            .on("error", err => {
-                console.error(err);
-                reject(err);
-            })
-            .mergeToFile(output, path.join(__dirname, "../temp"));
 
     });
 
