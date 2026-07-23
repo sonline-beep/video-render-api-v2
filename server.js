@@ -6,6 +6,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
+// Teste da API
 app.get("/", (req, res) => {
     res.json({
         status: "ok",
@@ -13,12 +14,27 @@ app.get("/", (req, res) => {
     });
 });
 
+// Endpoint de renderização
 app.post("/render", async (req, res) => {
+
+    const {
+        audio,
+        music,
+        videos
+    } = req.body;
+
+    console.log("========== NOVA REQUISIÇÃO ==========");
+    console.log("Áudio:", audio);
+    console.log("Música:", music);
+    console.log("Vídeos:", videos);
 
     res.json({
         status: "ok",
         message: "Render iniciado!",
-        dadosRecebidos: req.body
+        audio,
+        music,
+        videos,
+        quantidadeVideos: Array.isArray(videos) ? videos.length : 0
     });
 
 });
