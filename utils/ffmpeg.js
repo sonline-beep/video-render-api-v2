@@ -1,50 +1,76 @@
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
+const fs = require("fs");
+const path = require("path");
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-function renderVideo({ videos, audio, music, output }) {
+async function renderVideo(videos, audio, music, outputFolder) {
 
     return new Promise((resolve, reject) => {
 
-        const command = ffmpeg();
+        const listFile = path.join(outputFolder, "videos.txt");
 
-        // adiciona todos os vídeos
-        videos.forEach(video => {
-            command.input(video);
-        });
+        const txt = videos
+            .map(v => `file '${v.replace(/\\/g,"/")}'`)
+            .join("\n");
 
-        // adiciona narração
-        command.input(audio);
+        fs.writeFileSync(listFile, txt);
 
-        // adiciona música
-        command.input(music);
+        const joined = path.join(outputFolder, "joined.mp4");
 
-        command
-            .complexFilter([
-                {
-                    filter: "amix",
-                    options: {
-                        inputs: 2,
-                        duration: "first"
-                    },
-                    inputs: ["1:a", "2:a"],
-                    outputs: "mix"
-                }
+        ffmpeg()
+
+            .input(listFile)
+            .inputOptions([
+                "-f concat",
+                "-safe 0"
             ])
+
             .outputOptions([
-                "-map 0:v",
-                "-map [mix]",
-                "-shortest"
+                "-c copy"
             ])
-            .save(output)
-            .on("end", resolve)
+
+            .save(joined)
+
+            .on("end", () => {
+
+                const finalVideo = path.join(outputFolder, "video-final.mp4");
+
+                ffmpeg()
+
+                    .input(joined)
+
+                    .input(audio)
+
+                    .input(music)
+
+                    .complexFilter([
+                        "[1:a][2:a]amix=inputs=2:duration=first[a]"
+                    ])
+
+                    .outputOptions([
+                        "-map 0:v",
+                        "-map [a]",
+                        "-shortest"
+                    ])
+
+                    .save(finalVideo)
+
+                    .on("end", () => {
+
+                        resolve(finalVideo);
+
+                    })
+
+                    .on("error", reject);
+
+            })
+
             .on("error", reject);
 
     });
 
 }
 
-module.exports = {
-    renderVideo
-};
+module.exports = renderVideo;
