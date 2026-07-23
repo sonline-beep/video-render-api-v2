@@ -1,12 +1,16 @@
 {
   "name": "video-render-api-v2",
-  "version": "1.0.0",
-  "description": "Video Render API V2",
+  "version": "2.0.0",
+  "description": "API para renderização automática de vídeos",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "axios": "^1.7.2",
+    "express": "^4.21.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "fs-extra": "^11.2.0",
+    "uuid": "^11.0.5"
   }
 }
