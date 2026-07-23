@@ -29,11 +29,11 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     limits: {
-        fileSize: 1024 * 1024 * 500 // 500 MB por arquivo
+        fileSize: 1024 * 1024 * 500
     }
 });
 
-// Rota de teste
+// Teste
 app.get("/", (req, res) => {
     res.json({
         status: "ok",
@@ -41,78 +41,74 @@ app.get("/", (req, res) => {
     });
 });
 
-// Upload dos arquivos
-app.post(
-    "/render",
-    upload.fields([
-        {
-            name: "videos",
-            maxCount: 50
-        },
-        {
-            name: "audio",
-            maxCount: 1
-        },
-        {
-            name: "music",
-            maxCount: 1
-        }
-    ]),
-    async (req, res) => {
+// Upload
+app.post("/render", upload.any(), async (req, res) => {
 
-        try {
+    try {
 
-            const videos = req.files.videos || [];
-            const audio = req.files.audio || [];
-            const music = req.files.music || [];
+        const videos = req.files.filter(f =>
+            f.fieldname.startsWith("videos")
+        );
 
-            if (videos.length === 0) {
-                return res.status(400).json({
-                    status: "erro",
-                    message: "Nenhum vídeo enviado."
-                });
-            }
+        const audio = req.files.find(f =>
+            f.fieldname === "audio"
+        );
 
-            res.json({
-                status: "ok",
-                message: "Arquivos recebidos com sucesso.",
+        const music = req.files.find(f =>
+            f.fieldname === "music"
+        );
 
-                videos: videos.map(v => ({
-                    nome: v.originalname,
-                    arquivo: v.filename,
-                    tamanho: v.size
-                })),
-
-                audio: audio.length
-                    ? {
-                        nome: audio[0].originalname,
-                        arquivo: audio[0].filename,
-                        tamanho: audio[0].size
-                    }
-                    : null,
-
-                music: music.length
-                    ? {
-                        nome: music[0].originalname,
-                        arquivo: music[0].filename,
-                        tamanho: music[0].size
-                    }
-                    : null
-            });
-
-        } catch (err) {
-
-            console.error(err);
-
-            res.status(500).json({
+        if (videos.length === 0) {
+            return res.status(400).json({
                 status: "erro",
-                message: err.message
+                message: "Nenhum vídeo enviado."
             });
-
         }
+
+        res.json({
+
+            status: "ok",
+            message: "Arquivos recebidos.",
+
+            totalVideos: videos.length,
+
+            videos: videos.map(v => ({
+                campo: v.fieldname,
+                nome: v.originalname,
+                arquivo: v.filename,
+                tamanho: v.size
+            })),
+
+            audio: audio
+                ? {
+                    nome: audio.originalname,
+                    arquivo: audio.filename,
+                    tamanho: audio.size
+                }
+                : null,
+
+            music: music
+                ? {
+                    nome: music.originalname,
+                    arquivo: music.filename,
+                    tamanho: music.size
+                }
+                : null
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            status: "erro",
+            message: err.message
+        });
 
     }
-);
+
+});
 
 app.listen(PORT, () => {
     console.log(`Servidor iniciado na porta ${PORT}`);
